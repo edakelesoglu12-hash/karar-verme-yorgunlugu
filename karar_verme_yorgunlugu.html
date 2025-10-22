@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Karar Verme Yorgunluğu</title>
+<link href="https://unpkg.com/jspsych@7.2.0/dist/css/jspsych.css" rel="stylesheet">
+<script src="https://unpkg.com/jspsych@7.2.0/dist/jspsych.js"></script>
+<script src="https://unpkg.com/jspsych@7.2.0/dist/plugins/jspsych-html-button-response.js"></script>
+<script src="https://unpkg.com/jspsych@7.2.0/dist/plugins/jspsych-survey-likert.js"></script>
+<script src="https://unpkg.com/jspsych@7.2.0/dist/plugins/jspsych-survey-text.js"></script>
+<style>
+body { font-family: Arial; margin:20px; text-align:center; }
+.jspsych-btn { font-size:18px; padding:10px 20px; margin:5px; }
+</style>
+</head>
+<body>
+<div id="jspsych-target"></div>
+<script>
+let participant_id = 'P' + Math.floor(Math.random()*10000).toString().padStart(4,'0');
+const num_trials = 60;
+const trials = [];
+for(let i=0;i<num_trials;i++){
+  const left_easy = Math.random()<0.5;
+  trials.push({trial_num:i+1,left_easy:left_easy,easy_text:"Kolay seçim: 5 puan",hard_text:"Zor seçim: %50 -> 15 puan, %50 -> 0 puan"});
+}
+let timeline = [];
+timeline.push({type:'html-button-response', stimulus:'<h3>Karar Verme Yorgunluğu Deneyi</h3><p>Hazır olduğunuzda başlayın.</p>', choices:['Başla']});
+trials.forEach(tr=>{
+  const leftText = tr.left_easy ? tr.easy_text : tr.hard_text;
+  const rightText = tr.left_easy ? tr.hard_text : tr.easy_text;
+  timeline.push({
+    type:'html-button-response',
+    stimulus:`<div style="display:flex;justify-content:space-between;font-size:18px;">
+                 <div style="width:45%;border:1px solid #ccc;padding:10px;">${leftText}</div>
+                 <div style="width:45%;border:1px solid #ccc;padding:10px;">${rightText}</div>
+              </div>`,
+    choices:['Sol Seçeneği','Sağ Seçeneği'],
+    data:{trial_num:tr.trial_num,left_easy:tr.left_easy},
+    on_finish:function(data){
+      const choiceIndex = data.response;
+      let chosen_type = ((choiceIndex===0 && data.left_easy) || (choiceIndex===1 && !data.left_easy)) ? "easy" : "hard";
+      data.participant = participant_id;
+      data.chosen_type = chosen_type;
+      data.chosen_side = choiceIndex===0 ? "left" : "right";
+      data.points = chosen_type==="easy" ? 5 : Math.random()<0.5 ? 15 : 0;
+    }
+  });
+  timeline.push({type:'html-keyboard-response',stimulus:'',choices:"NO_KEYS",trial_duration:500});
+});
+const fatigue_questions = [
+  "Kendimi şu anda zihinsel olarak yorgun hissediyorum.",
+  "Karar vermek giderek daha zor hale geldi.",
+  "Dikkatim giderek dağılıyor.",
+  "Bu görev beni zihinsel olarak yoruyor.",
+  "Konsantrasyonum azaldı."
+];
+fatigue_questions.forEach((q,i)=>{
+  timeline.push({
+    type:'survey-likert',
+    preamble:'<p>1=Hiç katılmıyorum, 5=Tamamen katılıyorum</p>',
+    questions:[{prompt:q,labels:["1","2","3","4","5"],required:true}],
+    data:{participant:participant_id,question_num:i+1,survey_type:'fatigue'}
+  });
+});
+timeline.push({
+  type:'survey-text',
+  questions:[
+    {prompt:'Yaşınız:'},
+    {prompt:'Cinsiyetiniz (Kadın/Erkek/Diğer):'},
+    {prompt:'Günde ortalama sosyal medya kullanım süreniz (saat olarak) :'}
+  ],
+  data:{participant:participant_id,survey_type:'demographic'}
+});
+timeline.push({
+  type:'html-button-response',
+  stimulus:'<p>Deney tamamlandı, verileriniz CSV olarak indiriliyor...</p>',
+  choices:['Bitir'],
+  on_finish:function(){
+    const csv = jsPsych.data.get().csv();
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'results.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+});
+jsPsych.init({timeline:timeline,display_element:'jspsych-target',show_progress_bar:true,auto_update_progress_bar:true});
+</script>
+</body>
+</html>
